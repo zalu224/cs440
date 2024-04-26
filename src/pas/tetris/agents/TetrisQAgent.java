@@ -67,6 +67,9 @@ public class TetrisQAgent
         
         // qFunction.add(new Tanh());
         // qFunction.add(new Dense(hiddenDim, outDim));
+
+        //height(10), lines (clears), holes, blockades,  edge touching another block,
+            // edge touching wall, edge touching floor
         final int totalFeatures = numPixelsInImage + Board.NUM_COLS + 6; //
         // For the first hidden layer to have more neurons allows the network
         // to create a broad range of features combinations and interactions
@@ -141,15 +144,15 @@ public class TetrisQAgent
             }
 
             // Evalute potential for line completions and add to features
-            features.add(calculatePotentialLineCompletion(grayscaleImage));
+            features.add(calculateClears(game.getBoard()));
              
             // add number of holes to matrix
-            features.add(calculateHoles(grayscaleImage));
+            features.add(calculateHoles(game.getBoard()));
              
             // blockades added to features
-            features.add(calculateBlockades(grayscaleImage));
+            features.add(calculateBlockades(game.getBoard()));
 
-            calculateEdgeScores(grayscaleImage);
+            calculateEdgeScores(game.getBoard());
             //add features of edge touching certain parts of the board
             features.add(edgeTouchBlockM);
 
@@ -162,10 +165,9 @@ public class TetrisQAgent
  
             for (int row = 0; row < 1; row++) {
                  for (int col = 0; col < features.size(); col++) {
-                     zeroMatrix.set(row, col, features.get(col));
+                    zeroMatrix.set(row, col, features.get(col));
                  }
             }
-             
              
             resultingOneVectorMatrix = zeroMatrix;
 
@@ -352,7 +354,7 @@ public class TetrisQAgent
     public Mino getExplorationMove(final GameView game) {
         List<Mino> possibleActions = game.getFinalMinoPositions();
         double R_plus = calculateOptimisticRewardEstimate(game); // This is the optimistic estimate
-        
+        System.out.println("value of R_plus : " + R_plus);
         Mino bestAction = null;
         double bestValue = Double.NEGATIVE_INFINITY;
     
@@ -374,7 +376,7 @@ public class TetrisQAgent
     
         // Update the mino count and rewards for the selected action
         updateActionRewardAndCount(bestAction, game);
-    
+        System.out.println("Value of best reward:" + bestValue);
         return bestAction;
     }
     
@@ -750,37 +752,23 @@ public class TetrisQAgent
            for (int col = 0; col < board.NUM_COLS; ++col) {
               // Check if there is a block at this position
               if (board.isCoordinateOccupied(col, row)) {
-                 // Check for block to the left
-                 if (col > 0 && board.isCoordinateOccupied(col - 1, row)) {
-                    score += 3.0;
-                    edgeTouchBlock += 1.0;
-                 }
-                 // Check for block to the right
-                 if (col < board.NUM_COLS - 1 && board.isCoordinateOccupied(col + 1, row)) {
-                    score += 3.0;
-                    edgeTouchBlock += 1.0;
-                 }
-                 // Check for block below
-                 if (row < board.NUM_ROWS - 1 && board.isCoordinateOccupied(col, row + 1)) {
-                    score += 3.0;
-                    edgeTouchBlock += 1.0;
-                 }
-  
-                 // Check for wall on the left
-                 if (col == 0) {
-                    score += 2.5;
+        
+                 // Check for hugging the wall (edge of the current block touching edge of the wall)
+                if (col == 0 || col == board.NUM_COLS - 1) {
+                    score += 2.0;
                     edgeTouchWall += 1.0;
-                 }
-                 // Check for wall on the right
-                 if (col == board.NUM_COLS - 1) {
-                    score += 2.5;
-                    edgeTouchWall += 1.0;
-                 }
-                 // Check for floor
-                 if (row == board.NUM_ROWS - 1) {
-                    score += 5.0;
+                }
+                // Check for hugging the floor (edge of the current block touching the floor)
+                if (row == board.NUM_ROWS - 1) {
+                    score += 2.0;
                     edgeTouchFloor += 1.0;
-                 }
+                }
+                // Check for flattening (rewarding if the edge of the current block touches an existing block)
+                if ((col > 0 && board.isCoordinateOccupied(col - 1, row)) || (col < board.NUM_COLS - 1 && board.isCoordinateOccupied(col + 1, row)) || (row < board.NUM_ROWS - 1 && board.isCoordinateOccupied(col, row + 1))) {
+                    score += 3.0;
+                    edgeTouchBlock += 1.0;
+                }
+
               }
            }
         }
@@ -796,9 +784,9 @@ public class TetrisQAgent
 
     public double calculateEdgeScores(Matrix matrix) {
         double score = 0.0;
-        edgeTouchBlock = 0.0;
-        edgeTouchWall = 0.0;
-        edgeTouchFloor = 0.0;
+        edgeTouchBlockM = 0.0;
+        edgeTouchWallM = 0.0;
+        edgeTouchFloorM = 0.0;
 
         int numRows = matrix.getShape().getNumRows();
         int numCols = matrix.getShape().getNumCols();
@@ -807,43 +795,31 @@ public class TetrisQAgent
             for (int col = 0; col < numCols; ++col) {
                 // Check if there is a block at this position
                 if (matrix.get(row, col) != 0.0) {
-                    // Check for block to the left
-                    if (col > 0 && matrix.get(row, col-1) != 0.0) {
-                        score += 3.0;
-                        edgeTouchBlock += 1.0;
+                    //check for hugging wall
+                    if(col == 0 || col == numCols - 1){
+                        score += 2.0;
+                        edgeTouchWallM += 1;
                     }
-                    // Check for block to the right
-                    if (col < numCols - 1 && matrix.get(row, col + 1) != 0.0) {
-                        score += 3.0;
-                        edgeTouchBlock += 1.0;
+                    //check for hugging floor
+                    if (row == numRows - 1){
+                        score += 2;
+                        edgeTouchFloorM = 1;
                     }
-                    // Check for block below
-                    if (row < numRows - 1 && matrix.get(row + 1, col) != 0.0) {
-                        score += 3.0;
-                        edgeTouchBlock += 1.0;
+                    //check for flattening
+                    if((col>0 && matrix.get(row, col - 1) != 0.0) ||
+                        (col<numCols -1) && matrix.get(row, col+1) != 0.0 ||
+                        (row < numRows - 1 && matrix.get(row + 1 , col) != 0.0)){
+                        score += 3;
+                        edgeTouchBlockM += 1;
                     }
 
-                    // Check for wall on the left
-                    if (col == 0) {
-                        score += 2.5;
-                        edgeTouchWall += 1.0;
-                    }
-                    // Check for wall on the right
-                    if (col == numCols - 1) {
-                        score += 2.5;
-                        edgeTouchWall += 1.0;
-                    }
-                    // Check for floor
-                    if (row == numRows - 1) {
-                        score += 5.0;
-                        edgeTouchFloor += 1.0;
-                    }
                 }
             }
         }
 
         return score;
     }
+
 
 
     
