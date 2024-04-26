@@ -14,6 +14,7 @@ import edu.bu.battleship.game.Game;
 // JAVA PROJECT IMPORTS
 import edu.bu.tetris.agents.QAgent;
 import edu.bu.tetris.agents.TrainerAgent.GameCounter;
+import edu.bu.tetris.game.Block;
 import edu.bu.tetris.game.Board;
 import edu.bu.tetris.game.Game.GameView;
 import edu.bu.tetris.game.minos.Mino;
@@ -148,12 +149,13 @@ public class TetrisQAgent
             // blockades added to features
             features.add(calculateBlockades(grayscaleImage));
 
+            calculateEdgeScores(grayscaleImage);
             //add features of edge touching certain parts of the board
-            features.add(edgeTouchBlock);
+            features.add(edgeTouchBlockM);
 
-            features.add(edgeTouchWall);
+            features.add(edgeTouchWallM);
 
-            features.add(edgeTouchFloor);
+            features.add(edgeTouchFloorM);
 
             // turn the feature List into a Vector
             Matrix zeroMatrix = Matrix.zeros(1, features.size());
@@ -256,10 +258,11 @@ public class TetrisQAgent
         // blockades
         blockades = calculateBlockades(matrix);
     
+        calculateEdgeScores(matrix);
         // Calculate edgeToBlock, edgeToWall, edgeToFloor
-        edgeToBlock = edgeTouchBlock;
-        edgeToWall = edgeTouchWall;
-        edgeToFloor = edgeTouchFloor;
+        edgeToBlock = edgeTouchBlockM;
+        edgeToWall = edgeTouchWallM;
+        edgeToFloor = edgeTouchFloorM;
         
     
         // Calculate reward using the fitness function
@@ -286,6 +289,7 @@ public class TetrisQAgent
         double completeLines = calculateClears(board);
         double holes = calculateHoles(board);
         double blockades = calculateBlockades(board);
+        calculateEdgeScores(board);
         double edgeToBlock = edgeTouchBlock;
         double edgeToWall = edgeTouchWall;
         double edgeToFloor = edgeTouchFloor;
@@ -402,6 +406,7 @@ public class TetrisQAgent
         double height, double lines, double holes, double blockades,
         double edgeTBlock, double edgeTWall, double edgeTFloor
     ) {
+        
         // Use the weights from your reward function
         double reward = (-0.03 * height) - (7.5 * holes) - (3.5 * blockades) + 
                 (8.0 * lines) + (3.0 * edgeTBlock) + (2.5 * edgeTWall) + (5.0 * edgeTFloor);
@@ -548,12 +553,10 @@ public class TetrisQAgent
         
         double blockades = calculateBlockades(board);
 
-        double edgeTBlock = edgeTouchBlock;
-        double edgeTWall = edgeTouchWall;
-        double edgeTFloor = edgeTouchFloor;
+        double score = calculateEdgeScores(board);
         
         double reward = (-0.03*heightScore) - (7.5*holes) - (3.5*blockades) + 
-            (8.0*clears)+(3.0*edgeTBlock) + (2.5*edgeTWall) + (5.0*edgeTFloor);
+            (8.0*clears)+score;
 
         return reward;
         // return game.getScoreThisTurn();
@@ -786,6 +789,65 @@ public class TetrisQAgent
     
     }
     
+
+    public double edgeTouchBlockM;
+    public double edgeTouchWallM;
+    public double edgeTouchFloorM;
+
+    public double calculateEdgeScores(Matrix matrix) {
+        double score = 0.0;
+        edgeTouchBlock = 0.0;
+        edgeTouchWall = 0.0;
+        edgeTouchFloor = 0.0;
+
+        int numRows = matrix.getShape().getNumRows();
+        int numCols = matrix.getShape().getNumCols();
+
+        for (int row = 0; row < numRows; ++row) {
+            for (int col = 0; col < numCols; ++col) {
+                // Check if there is a block at this position
+                if (matrix.get(row, col) != 0.0) {
+                    // Check for block to the left
+                    if (col > 0 && matrix.get(row, col-1) != 0.0) {
+                        score += 3.0;
+                        edgeTouchBlock += 1.0;
+                    }
+                    // Check for block to the right
+                    if (col < numCols - 1 && matrix.get(row, col + 1) != 0.0) {
+                        score += 3.0;
+                        edgeTouchBlock += 1.0;
+                    }
+                    // Check for block below
+                    if (row < numRows - 1 && matrix.get(row + 1, col) != 0.0) {
+                        score += 3.0;
+                        edgeTouchBlock += 1.0;
+                    }
+
+                    // Check for wall on the left
+                    if (col == 0) {
+                        score += 2.5;
+                        edgeTouchWall += 1.0;
+                    }
+                    // Check for wall on the right
+                    if (col == numCols - 1) {
+                        score += 2.5;
+                        edgeTouchWall += 1.0;
+                    }
+                    // Check for floor
+                    if (row == numRows - 1) {
+                        score += 5.0;
+                        edgeTouchFloor += 1.0;
+                    }
+                }
+            }
+        }
+
+        return score;
+    }
+
+
+    
+          
 
     // private static final int a = 100;
 
