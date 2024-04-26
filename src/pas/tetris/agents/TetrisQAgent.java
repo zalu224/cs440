@@ -270,7 +270,32 @@ public class TetrisQAgent
     }
 
     
-    
+   
+    public double calculateReward(Board board) {
+        // Weights for different board features
+        double weightHeight = -0.03;
+        double weightLines = 8.0;
+        double weightHoles = -7.5;
+        double weightBlockades = -3.5;
+        double weightETB = 3.0;  // Edge Touching Block
+        double weightETW = 2.5;  // Edge Touching Wall
+        double weightETF = 5.0;  // Edge Touching Floor
+
+        // Calculate board features
+        double aggregateHeight = calculateSumOfHeights(board);
+        double completeLines = calculateClears(board);
+        double holes = calculateHoles(board);
+        double blockades = calculateBlockades(board);
+        double edgeToBlock = edgeTouchBlock;
+        double edgeToWall = edgeTouchWall;
+        double edgeToFloor = edgeTouchFloor;
+
+        // Calculate reward using the fitness function
+        double reward = (weightHeight * aggregateHeight) - (weightHoles * holes) - (weightBlockades * blockades) +
+                        (weightLines * completeLines) + (weightETB * edgeToBlock) + (weightETW * edgeToWall) + (weightETF * edgeToFloor);
+
+        return reward;
+    }
 
     /**
      * This method is used to decide if we should follow our current policy
