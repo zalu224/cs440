@@ -177,7 +177,7 @@ public class TetrisQAgent
             System.exit(-1);
         }
 
-        //height of columns in game, number of line completions, 3 classified holes, bumpiness
+        //height of columns in game, number of line completions (clears), holes, blockades, etb, etw, etf
         return resultingOneVectorMatrix;
     }
 
@@ -349,17 +349,14 @@ public class TetrisQAgent
     int totalMinoCount = 0;
     // Upper Confidence Bound (UCB) parameters
     private static final double C = Math.sqrt(2);
-    private static final int NE = 10; // Threshold for "seen this action-state pair enough times"
 
     public Mino getExplorationMove(final GameView game) {
         List<Mino> possibleActions = game.getFinalMinoPositions();
-        double R_plus = calculateOptimisticRewardEstimate(game); // This is the optimistic estimate
-        System.out.println("value of R_plus : " + R_plus);
         Mino bestAction = null;
         double bestValue = Double.NEGATIVE_INFINITY;
     
         for (Mino action : possibleActions) {
-            double u = minoToReward.getOrDefault(action, R_plus); // Use R_plus for initial rewards
+            double u = minoToReward.getOrDefault(action, 0.0) / (minoToCount.getOrDefault(action, 0) + 1);
             int n = minoToCount.getOrDefault(action, 0);
             double explorationValue = u + C * Math.sqrt(Math.log(totalMinoCount + 1) / (n + 1));
             
@@ -376,65 +373,46 @@ public class TetrisQAgent
     
         // Update the mino count and rewards for the selected action
         updateActionRewardAndCount(bestAction, game);
-        System.out.println("Value of best reward:" + bestValue);
         return bestAction;
     }
     
-    private double calculateOptimisticRewardEstimate(GameView game) {
-        // Define optimistic values for features
-        double optimisticHeight = 0; // Ideally, the stack is low
-        double optimisticLines = Board.NUM_ROWS; // Optimistically, all lines could be cleared
-        double optimisticHoles = 0; // No holes optimistically
-        double optimisticBlockades = 0; // No blockades optimistically
-        double optimisticEdgeTBlock = Board.NUM_ROWS * Board.NUM_COLS; // Max edges touching blocks
-        double optimisticEdgeTWall = 2 * (Board.NUM_ROWS + Board.NUM_COLS); // All edges touching walls
-        double optimisticEdgeTFloor = Board.NUM_COLS; // All columns have edges touching the floor
-    
-        // Calculate R+ based on the weighted sum of optimistic estimates
-        double R_plus = calculateRewardFromFeatures(
-            optimisticHeight,
-            optimisticLines,
-            optimisticHoles,
-            optimisticBlockades,
-            optimisticEdgeTBlock,
-            optimisticEdgeTWall,
-            optimisticEdgeTFloor
-        );
-    
-        return R_plus;
-    }
-    
-    private double calculateRewardFromFeatures(
-        double height, double lines, double holes, double blockades,
-        double edgeTBlock, double edgeTWall, double edgeTFloor
-    ) {
-        
-        // Use the weights from your reward function
-        double reward = (-0.03 * height) - (7.5 * holes) - (3.5 * blockades) + 
-                (8.0 * lines) + (3.0 * edgeTBlock) + (2.5 * edgeTWall) + (5.0 * edgeTFloor);
-        return reward;
-    }
-    
     private void updateActionRewardAndCount(Mino action, GameView game) {
-        // copy board state
-        Board boardCopy = new Board(game.getBoard());
-
-        // Add the Mino to the copied board to simulate the action
-        boardCopy.addMino(action);
+        double rewardAfterAction = 0.0;
+        try{
+            // Calculate the reward based on the new state of the board after the action
+            rewardAfterAction = calculateRewardMino(game, action);
+            System.out.println("reward for Action: " +rewardAfterAction);
+        } catch (Exception err){
+            System.out.println("failed to get reward from grayscale: " + err.getMessage());
+            err.printStackTrace();
+        }
         
-        // Calculate the reward based on the new state of the board after the action
-        double rewardAfterAction = calculateReward(boardCopy);
+        // Retrieve the current total reward for the action and the number of times the action has been taken
+        double currentTotalReward = minoToReward.getOrDefault(action, 0.0);
+        int currentActionCount = minoToCount.getOrDefault(action, 0);
 
-        // Update the cumulative reward for this action
-        double totalReward = minoToReward.getOrDefault(action, 0.0) + rewardAfterAction;
-        minoToReward.put(action, totalReward);
-
-        // Update the count of how many times the action has been taken
-        int actionCount = minoToCount.getOrDefault(action, 0) + 1;
-        minoToCount.put(action, actionCount);
+        // Update the cumulative reward and count for this action
+        minoToReward.put(action, currentTotalReward + rewardAfterAction);
+        minoToCount.put(action, currentActionCount + 1);
 
         // Increment the total count of actions taken
-        totalMinoCount += 1;
+        totalMinoCount++;
+    }
+    private double calculateRewardMino(final GameView game, Mino mino){
+        double inverseScore = 0.0;
+        try {
+            Matrix grayscaleMatrix = game.getGrayscaleImage(mino);
+            inverseScore = calculateReward(grayscaleMatrix);
+            inverseScore = aOverSqrtX(inverseScore);
+        } catch (Exception err) {
+            System.err.println("Failed to generate grayscale image: " + err.getMessage());
+            err.printStackTrace();
+        }
+        if (inverseScore == 0.0){
+            throw new IllegalArgumentException("The method getRewardForMinoInMatrix()" + 
+            "returned a score of 0.0, which should not be allowed.");
+        }
+        return inverseScore;
     }
     // we could for one use getReward to examine the current board, 
     // or i can keep a hashmap of each mino with its count
@@ -825,17 +803,17 @@ public class TetrisQAgent
     
           
 
-    // private static final int a = 100;
+    private static final int a = 100;
 
-    // private double aOverSqrtX(double x) {
-    //     if (x < 0) {
-    //         throw new IllegalArgumentException("x cannot be negative");
-    //     }
-    //     if (x == 0.0) {
-    //         return 0.0;
-    //     }
-    //     return a / (Math.sqrt(x));
-    // }
+    private double aOverSqrtX(double x) {
+        if (x < 0) {
+            throw new IllegalArgumentException("x cannot be negative");
+        }
+        if (x == 0.0) {
+            return 0.0;
+        }
+        return a / (Math.sqrt(x));
+    }
 
     // private double getLineCompleteScore(double scoreThisTurn) {
     //     return Math.exp(3.0 / 4.0 * scoreThisTurn) - 1;
