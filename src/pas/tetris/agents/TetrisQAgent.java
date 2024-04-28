@@ -348,56 +348,73 @@ public class TetrisQAgent
     HashMap<Mino, Integer> minoToCount = new HashMap<Mino, Integer>();
     int totalMinoCount = 0;
     // Upper Confidence Bound (UCB) parameters
-    private static final double C = Math.sqrt(2);
+    // private static final double C = Math.sqrt(2);
 
     public Mino getExplorationMove(final GameView game) {
         List<Mino> possibleActions = game.getFinalMinoPositions();
-        Mino bestAction = null;
-        double bestValue = Double.NEGATIVE_INFINITY;
+    
+        double bestUCBScoreSoFar = 0.0;
+        Mino bestMinoPositionSoFar = null;
+
     
         for (Mino action : possibleActions) {
-            double u = minoToReward.getOrDefault(action, 0.0) / (minoToCount.getOrDefault(action, 0) + 1);
-            int n = minoToCount.getOrDefault(action, 0);
-            double explorationValue = u + C * Math.sqrt(Math.log(totalMinoCount + 1) / (n + 1));
             
-            if (explorationValue > bestValue) {
-                bestValue = explorationValue;
-                bestAction = action;
+            double currentMinoTotalReward = minoToReward.getOrDefault(action,
+            calculateRewardMino(game, action));
+            int currentMinoCount = minoToCount.getOrDefault(action, 1);
+            int localMinoCount = totalMinoCount;
+            if (totalMinoCount == 0) {
+                localMinoCount = 1;
+            }
+
+            double UCBScore = getUCBScore(currentMinoTotalReward, currentMinoCount, localMinoCount);
+
+            if (UCBScore > bestUCBScoreSoFar) {
+                bestUCBScoreSoFar = UCBScore;
+                bestMinoPositionSoFar = action;
             }
         }
     
-        if (bestAction == null) {
-            int randomIndex = this.getRandom().nextInt(possibleActions.size());
-            bestAction = possibleActions.get(randomIndex);
+        // sanity check
+        if (bestUCBScoreSoFar == 0.0 || bestMinoPositionSoFar == null) {
+            throw new IllegalArgumentException("Either bestUCBScoreSoFar == 0.0 " +
+            "or bestMinoPositionSoFar == null, meaning a valid exploration move " +
+            "was not selected.");
         }
-    
-        // Update the mino count and rewards for the selected action
-        updateActionRewardAndCount(bestAction, game);
-        return bestAction;
+        // update minoToReward
+        double minoTotalReward = minoToReward.getOrDefault(bestMinoPositionSoFar, 0.0);
+        minoToReward.put(bestMinoPositionSoFar, minoTotalReward + calculateRewardMino(game, bestMinoPositionSoFar));
+        // update minoToCount
+        int minoTotalCount = minoToCount.getOrDefault(bestMinoPositionSoFar, 0);
+        minoToCount.put(bestMinoPositionSoFar, minoTotalCount + 1);
+        // update totalMinoCount
+        totalMinoCount += 1;
+
+        return bestMinoPositionSoFar;
     }
     
-    private void updateActionRewardAndCount(Mino action, GameView game) {
-        double rewardAfterAction = 0.0;
-        try{
-            // Calculate the reward based on the new state of the board after the action
-            rewardAfterAction = calculateRewardMino(game, action);
-            System.out.println("reward for Action: " +rewardAfterAction);
-        } catch (Exception err){
-            System.out.println("failed to get reward from grayscale: " + err.getMessage());
-            err.printStackTrace();
-        }
+    // private void updateActionRewardAndCount(Mino action, GameView game) {
+    //     double rewardAfterAction = 0.0;
+    //     try{
+    //         // Calculate the reward based on the new state of the board after the action
+    //         rewardAfterAction = calculateRewardMino(game, action);
+    //         // System.out.println("reward for Action: " +rewardAfterAction);
+    //     } catch (Exception err){
+    //         System.out.println("failed to get reward from grayscale: " + err.getMessage());
+    //         err.printStackTrace();
+    //     }
         
-        // Retrieve the current total reward for the action and the number of times the action has been taken
-        double currentTotalReward = minoToReward.getOrDefault(action, 0.0);
-        int currentActionCount = minoToCount.getOrDefault(action, 0);
+    //     // Retrieve the current total reward for the action and the number of times the action has been taken
+    //     double currentTotalReward = minoToReward.getOrDefault(action, 0.0);
+    //     int currentActionCount = minoToCount.getOrDefault(action, 0);
 
-        // Update the cumulative reward and count for this action
-        minoToReward.put(action, currentTotalReward + rewardAfterAction);
-        minoToCount.put(action, currentActionCount + 1);
+    //     // Update the cumulative reward and count for this action
+    //     minoToReward.put(action, currentTotalReward + rewardAfterAction);
+    //     minoToCount.put(action, currentActionCount + 1);
 
-        // Increment the total count of actions taken
-        totalMinoCount++;
-    }
+    //     // Increment the total count of actions taken
+    //     totalMinoCount++;
+    // }
     private double calculateRewardMino(final GameView game, Mino mino){
         double inverseScore = 0.0;
         try {
@@ -416,20 +433,12 @@ public class TetrisQAgent
     }
     // we could for one use getReward to examine the current board, 
     // or i can keep a hashmap of each mino with its count
-    // private static final double UCBTunabilityFactor = Math.sqrt(2);
+    private static final double UCBTunabilityFactor = Math.sqrt(2);
 
-    // private double getUCBScore(double minoReward, int minoCount, int totalMinoCount) {
-    //     double avgMinoReward = minoReward / minoCount;
-    //     return avgMinoReward + UCBTunabilityFactor * Math.sqrt(Math.log(totalMinoCount) / minoCount);
-    // }
-    // we could for one use getReward to examine the current board, 
-    // or i can keep a hashmap of each mino with its count
-    // private static final double UCBTunabilityFactor = Math.sqrt(2);
-
-    // private double getUCBScore(double minoReward, int minoCount, int totalMinoCount) {
-    //     double avgMinoReward = minoReward / minoCount;
-    //     return avgMinoReward + UCBTunabilityFactor * Math.sqrt(Math.log(totalMinoCount) / minoCount);
-    // }
+    private double getUCBScore(double minoReward, int minoCount, int totalMinoCount) {
+        double avgMinoReward = minoReward / minoCount;
+        return avgMinoReward + UCBTunabilityFactor * Math.sqrt(Math.log(totalMinoCount) / minoCount);
+    }
 
     // private double getRewardForMino(final GameView game, Mino mino) {
     //     double score = 0.0;
@@ -797,13 +806,9 @@ public class TetrisQAgent
 
         return score;
     }
-
-
-
-    
           
 
-    private static final int a = 100;
+    private static final int a = 1000;
 
     private double aOverSqrtX(double x) {
         if (x < 0) {
