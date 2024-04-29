@@ -270,7 +270,8 @@ public class TetrisQAgent
         // Calculate reward using the fitness function
         double reward = (weightHeight*aggregateHeight) - (weightHoles*holes) - (weightBlockades*blockades) + 
         (weightLines*completeLines)+(weightETB*edgeToBlock) + (weightETW*edgeToWall) + (weightETF*edgeToFloor);
-    
+        // System.out.println("Matrix reward before eLog:" +reward);
+        // System.out.println("Edge scores:" + edgeToBlock + " , " + edgeToWall + " , " + edgeToFloor);
         return eLog(reward);
     }
 
@@ -538,7 +539,11 @@ public class TetrisQAgent
         // return game.getScoreThisTurn();
     }
     private double eLog(double score){
-        return Math.exp(-Math.log(score));
+        if (score < 0){
+            return Math.exp(-Math.log(Math.abs(score)));
+        } else {
+            return Math.exp(Math.log(score));
+        }
     }
     private double calculatePotentialLineCompletion(Matrix matrix) {
         double completeLines = 0.0;
