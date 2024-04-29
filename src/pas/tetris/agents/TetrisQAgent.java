@@ -271,7 +271,7 @@ public class TetrisQAgent
         double reward = (weightHeight*aggregateHeight) - (weightHoles*holes) - (weightBlockades*blockades) + 
         (weightLines*completeLines)+(weightETB*edgeToBlock) + (weightETW*edgeToWall) + (weightETF*edgeToFloor);
     
-        return reward;
+        return eLog(reward);
     }
 
     
@@ -300,7 +300,7 @@ public class TetrisQAgent
         double reward = (weightHeight * aggregateHeight) - (weightHoles * holes) - (weightBlockades * blockades) +
                         (weightLines * completeLines) + (weightETB * edgeToBlock) + (weightETW * edgeToWall) + (weightETF * edgeToFloor);
 
-        return reward;
+        return eLog(reward);
     }
 
     /**
@@ -353,44 +353,32 @@ public class TetrisQAgent
     public Mino getExplorationMove(final GameView game) {
         List<Mino> possibleActions = game.getFinalMinoPositions();
     
-        double bestUCBScoreSoFar = 0.0;
-        Mino bestMinoPositionSoFar = null;
+        double bestValue = Double.NEGATIVE_INFINITY;
+        Mino bestAction = null;
 
     
         for (Mino action : possibleActions) {
-            
-            double currentMinoTotalReward = minoToReward.getOrDefault(action,
-            calculateRewardMino(game, action));
-            int currentMinoCount = minoToCount.getOrDefault(action, 1);
-            int localMinoCount = totalMinoCount;
-            if (totalMinoCount == 0) {
-                localMinoCount = 1;
-            }
-
-            double UCBScore = getUCBScore(currentMinoTotalReward, currentMinoCount, localMinoCount);
-
-            if (UCBScore > bestUCBScoreSoFar) {
-                bestUCBScoreSoFar = UCBScore;
-                bestMinoPositionSoFar = action;
+            double u = minoToReward.getOrDefault(action, 0.0);
+            int n = minoToCount.getOrDefault(action, 0);
+            double explorationValue = u / (n + 1) + UCBTunabilityFactor * Math.sqrt(Math.log(totalMinoCount + 1) / (n + 1));
+    
+            if (explorationValue > bestValue) {
+                bestValue = explorationValue;
+                bestAction = action;
             }
         }
     
-        // sanity check
-        if (bestUCBScoreSoFar == 0.0 || bestMinoPositionSoFar == null) {
-            throw new IllegalArgumentException("Either bestUCBScoreSoFar == 0.0 " +
-            "or bestMinoPositionSoFar == null, meaning a valid exploration move " +
-            "was not selected.");
+        // If no action has a better value than the very negative starting point, pick random action
+        if (bestAction == null) {
+            bestAction = possibleActions.get(this.getRandom().nextInt(possibleActions.size()));
+        } else {
+            // Update the mino count and rewards for the selected action
+            minoToReward.put(bestAction, minoToReward.getOrDefault(bestAction, 0.0) + calculateRewardMino(game, bestAction));
+            minoToCount.put(bestAction, minoToCount.getOrDefault(bestAction, 0) + 1);
         }
-        // update minoToReward
-        double minoTotalReward = minoToReward.getOrDefault(bestMinoPositionSoFar, 0.0);
-        minoToReward.put(bestMinoPositionSoFar, minoTotalReward + calculateRewardMino(game, bestMinoPositionSoFar));
-        // update minoToCount
-        int minoTotalCount = minoToCount.getOrDefault(bestMinoPositionSoFar, 0);
-        minoToCount.put(bestMinoPositionSoFar, minoTotalCount + 1);
-        // update totalMinoCount
-        totalMinoCount += 1;
-
-        return bestMinoPositionSoFar;
+    
+        totalMinoCount++; // Increment the total count of actions taken
+        return bestAction;
     }
     
     // private void updateActionRewardAndCount(Mino action, GameView game) {
@@ -420,7 +408,6 @@ public class TetrisQAgent
         try {
             Matrix grayscaleMatrix = game.getGrayscaleImage(mino);
             inverseScore = calculateReward(grayscaleMatrix);
-            inverseScore = aOverSqrtX(inverseScore);
         } catch (Exception err) {
             System.err.println("Failed to generate grayscale image: " + err.getMessage());
             err.printStackTrace();
@@ -435,10 +422,10 @@ public class TetrisQAgent
     // or i can keep a hashmap of each mino with its count
     private static final double UCBTunabilityFactor = Math.sqrt(2);
 
-    private double getUCBScore(double minoReward, int minoCount, int totalMinoCount) {
-        double avgMinoReward = minoReward / minoCount;
-        return avgMinoReward + UCBTunabilityFactor * Math.sqrt(Math.log(totalMinoCount) / minoCount);
-    }
+    // private double getUCBScore(double minoReward, int minoCount, int totalMinoCount) {
+    //     double avgMinoReward = minoReward / minoCount;
+    //     return avgMinoReward + UCBTunabilityFactor * Math.sqrt(Math.log(totalMinoCount) / minoCount);
+    // }
 
     // private double getRewardForMino(final GameView game, Mino mino) {
     //     double score = 0.0;
@@ -547,10 +534,12 @@ public class TetrisQAgent
         double reward = (-0.03*heightScore) - (7.5*holes) - (3.5*blockades) + 
             (8.0*clears)+score;
 
-        return reward;
+        return eLog(reward);
         // return game.getScoreThisTurn();
     }
-
+    private double eLog(double score){
+        return Math.exp(-Math.log(score));
+    }
     private double calculatePotentialLineCompletion(Matrix matrix) {
         double completeLines = 0.0;
         for (int row = 0; row < matrix.getShape().getNumRows(); row++) {
@@ -808,17 +797,17 @@ public class TetrisQAgent
     }
           
 
-    private static final int a = 1000;
+    // private static final int a = 100;
 
-    private double aOverSqrtX(double x) {
-        if (x < 0) {
-            throw new IllegalArgumentException("x cannot be negative");
-        }
-        if (x == 0.0) {
-            return 0.0;
-        }
-        return a / (Math.sqrt(x));
-    }
+    // private double aOverSqrtX(double x) {
+    //     if (x < 0) {
+    //         throw new IllegalArgumentException("x cannot be negative");
+    //     }
+    //     if (x == 0.0) {
+    //         return 0.0;
+    //     }
+    //     return a / (Math.sqrt(x));
+    // }
 
     // private double getLineCompleteScore(double scoreThisTurn) {
     //     return Math.exp(3.0 / 4.0 * scoreThisTurn) - 1;
