@@ -586,65 +586,31 @@ public class TetrisQAgent
     //     return Math.exp(1 - (0.15 * maxColumnHeight));
     // }
 
-    // private double calculateBumpiness(Matrix matrix){
-    //     double bumpiness = 0.0;
+    private double calculateBumpiness(Matrix matrix){
+        double bumpiness = 0.0;
 
-    //     int matrixWidth = matrix.getShape().getNumCols();
-    //     int matrixHeight = matrix.getShape().getNumRows();
-    //     int[] columnHeights = new int[matrixWidth];
+        int matrixWidth = matrix.getShape().getNumCols();
+        int matrixHeight = matrix.getShape().getNumRows();
+        int[] columnHeights = new int[matrixWidth];
     
-    //     // Compute heights
-    //     for (int col = 0; col < matrixWidth; col++) {
-    //         columnHeights[col] = 0; // Assume the column is empty
-    //         for (int row = matrixHeight - 1; row >= 0; row--) {
-    //             if (matrix.get(row, col) != 0.0) {
-    //                 columnHeights[col] = row; // Record the height
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     // Calculate bumpiness
-    //     for (int col = 0; col < matrixWidth - 1; col++) {
-    //         bumpiness += Math.abs(columnHeights[col] - columnHeights[col + 1]);
-    //     }
-    //     return bumpiness;
+        // Compute heights
+        for (int col = 0; col < matrixWidth; col++) {
+            columnHeights[col] = 0; // Assume the column is empty
+            for (int row = matrixHeight - 1; row >= 0; row--) {
+                if (matrix.get(row, col) != 0.0) {
+                    columnHeights[col] = row; // Record the height
+                    break;
+                }
+            }
+        }
+        // Calculate bumpiness
+        for (int col = 0; col < matrixWidth - 1; col++) {
+            bumpiness += Math.abs(columnHeights[col] - columnHeights[col + 1]);
+        }
+        return bumpiness;
+    }
 
-    // }
-    /* a = -0.798752914564018
-            b = 0.522287506868767
-            c = -0.24921408023878
-             d = -0.164626498034284
-        field_value = Height * a + Complete_lines * b + Holes * c + Bumpiness * d
-    */
-    // private double calculateReward(Board board) {
-    //     double weightHeight = -0.798752914564018;
-    //     double weightLines =  0.522287506868767;
-    //     double weightHoles = -0.24921408023878;
-    //     double weightBumpiness = -0.164626498034284; 
-
-    //     // double weightHeight = -0.51;
-    //     // double weightLines = 0.76;
-    //     // double weightHoles = -0.36;
-    //     // double weightBumpiness = -0.18;
     
-    //     // Initialize features
-    //     double aggregateHeight = 0;
-    //     double completeLines = 0;
-    //     double holes = 0;
-    //     double bumpiness = 0;
-    
-    //     int[] columnHeights = new int[board.NUM_COLS];
-    
-       
-    
-    //     // Calculate reward using the fitness function
-    //     double reward = weightHeight * aggregateHeight +
-    //                     weightLines * completeLines +
-    //                     weightHoles * holes +
-    //                     weightBumpiness * bumpiness;
-    
-    //     return reward;
-    // }
 
     private List<Integer> getFullLines(Board board) {
         List<Integer> fullLines = new ArrayList<>();
@@ -802,19 +768,5 @@ public class TetrisQAgent
     }
           
 
-    // private static final int a = 100;
 
-    // private double aOverSqrtX(double x) {
-    //     if (x < 0) {
-    //         throw new IllegalArgumentException("x cannot be negative");
-    //     }
-    //     if (x == 0.0) {
-    //         return 0.0;
-    //     }
-    //     return a / (Math.sqrt(x));
-    // }
-
-    // private double getLineCompleteScore(double scoreThisTurn) {
-    //     return Math.exp(3.0 / 4.0 * scoreThisTurn) - 1;
-    // }
 }
